@@ -285,6 +285,7 @@ class Go2Trot(LeggedRobot):
             dim=1,
         )
 
+    # Give a reward absed on how well the height tracks the inputted commands
     def _reward_tracking_base_height(self):
         error = torch.square(self.base_height[:, 0] - self.commands[:, 3])
         return torch.exp(-error / self.cfg.reward_settings.tracking_sigma_height)

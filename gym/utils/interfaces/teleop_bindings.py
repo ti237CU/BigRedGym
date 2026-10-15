@@ -82,7 +82,7 @@ class TeleopCommands:
         self.has_height = env.commands.shape[1] > 3
         if self.has_height:
             self.min_height, self.max_height = env.command_ranges["base_height"]
-            self.increment_height = 0.02
+            self.increment_height = 0.2
             env.hold_height_command = True
 
         env.commands[:, :3] = 0.0   # Start at zero velocity
