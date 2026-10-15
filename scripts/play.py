@@ -146,6 +146,22 @@ if __name__ == "__main__":
     args = get_play_args()
     with torch.no_grad():
         env, runner = setup(args)
+
+        # Make the MuJoCo viewer camera follow robot base.
+        viewer = getattr(env._backend, "_viewer", None)
+        if viewer is not None:
+            import mujoco
+
+            base_id = mujoco.mj_name2id(
+                env._backend._mjm, mujoco.mjtObj.mjOBJ_BODY, "base"
+            )
+            with viewer.lock():
+                viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+                viewer.cam.trackbodyid = base_id
+                viewer.cam.distance = 1.5    # meters from the robot
+                viewer.cam.elevation = -15   # degrees, negative = looking down
+                viewer.cam.azimuth = 135     # degrees around the robot
+
         # The MuJoCo warp (GPU) backend is headless-only: render() is a no-op and
         # it has no passive viewer, so nothing draws.  Point the user at cpu.
         if (

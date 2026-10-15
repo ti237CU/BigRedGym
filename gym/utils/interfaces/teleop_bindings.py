@@ -79,11 +79,16 @@ class TeleopCommands:
         self.max_vel_yaw = 2.0
         self.increment_yaw = self.max_vel_yaw * 0.2
 
-        self.max_vel_up = 2.0
-        self.increment_up = self.max_vel_up * 0.2
+        self.has_height = env.commands.shape[1] > 3
+        if self.has_height:
+            self.min_height, self.max_height = env.command_ranges["base_height"]
+            self.increment_height = 0.02
+            env.hold_height_command = True
 
-        env.commands[:] = 0.0
-        env.commands[:, 0] = 1.0  # seed forward velocity so motion is visible
+        env.commands[:, :3] = 0.0   # Start at zero velocity
+        if self.has_height:
+            env.commands[:, 3] = 0.5 * (self.min_height + self.max_height)
+
         if hasattr(env.cfg, "commands"):
             env.cfg.commands.resampling_time = env.max_episode_length_s + 1
 
@@ -107,13 +112,16 @@ class TeleopCommands:
             c[:, 2] = torch.clamp(c[:, 2] - self.increment_yaw, min=-self.max_vel_yaw)
 
         elif action == "up":
-            c[:, 3] == torch.clamp(c[:, 3] + self.increment_up, max=self.max_vel_up)
+            if self.has_height:
+                c[:, 3] = torch.clamp(c[:, 3] + self.increment_height, max=self.max_height)
         elif action == "down":
-            c[:, 3] == torch.clamp(c[:, 3] + self.increment_down, max=-self.max_vel_up)
+            if self.has_height:
+                c[:, 3] = torch.clamp(c[:, 3] - self.increment_height, min=self.min_height)
 
         elif action == "reset":
             self.env.timed_out[:] = True
             self.env.reset()
+            c[:, :3] = 0.0      # reset re-randomizes velocity (start still again)
         else:
             raise ValueError(f"unknown teleop action {action!r}")
 

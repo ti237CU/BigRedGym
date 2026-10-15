@@ -13,6 +13,14 @@ class Go2Trot(LeggedRobot):
     def _init_buffers(self):
         super()._init_buffers()
 
+        # Implement a height command
+        low, high = self.command_ranges["base_height"]
+        self.commands = torch.zeros(
+            self.num_envs, 4 , dtype=torch.float, device=self.device
+        )
+        self.commands[:, 3] = 0.5 * (low + high)
+        self.hold_height_command = False
+
         self._actuated_dof_pos_limits = self.dof_pos_limits.index_select(
             0, self.actuated_dof_indices
         )
@@ -115,6 +123,7 @@ class Go2Trot(LeggedRobot):
         masked_update(self.phase_frequency, phase_frequency, reset_mask)
 
     def _resample_commands(self, command_mask):
+        height_before = self.commands[:, 3].clone()
         super()._resample_commands(command_mask)
 
         forward_commands = torch.tensor(
@@ -144,6 +153,29 @@ class Go2Trot(LeggedRobot):
                 torch.rand(self.num_envs, 1, device=self.device) >= 0.9
             )
             self.commands.masked_fill_(drop, 0.0)
+
+        self._resample_height_command(command_mask, height_before)
+
+    def _resample_height_command(self, command_mask, height_before):
+        if self.hold_height_command:
+            self.commands[:, 3] = height_before
+            return
+        low, high = self.command_ranges["base_height"]
+        n = self.num_envs
+        height = torch_rand_float(low, high, shape=(n, 1), device=self.device)
+        height = height.squeeze(1)
+        # Put a fraction of samples exactly on the extremes.
+        extreme = (
+            torch.rand(n, device=self.device)
+            < self.cfg.commands.base_height_extreme_prob
+        )
+        endpoint = torch.where(
+            torch.rand(n, device=self.device) < 0.5,
+            torch.full((n,), low, device=self.device),
+            torch.full((n,), high, device=self.device),
+        )
+        height = torch.where(extreme, endpoint, height)
+        self.commands[:, 3] = torch.where(command_mask, height, height_before)
 
     def _reset_idx(self, reset_mask):
         super()._reset_idx(reset_mask)
@@ -252,3 +284,7 @@ class Go2Trot(LeggedRobot):
             ),
             dim=1,
         )
+
+    def _reward_tracking_base_height(self):
+        error = torch.square(self.base_height[:, 0] - self.commands[:, 3])
+        return torch.exp(-error / self.cfg.reward_settings.tracking_sigma_height)
