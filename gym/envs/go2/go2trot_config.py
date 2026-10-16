@@ -89,6 +89,7 @@ class Go2TrotCfg(Go2Cfg):
         file = "{GYM_ROOT_DIR}/resources/robots/" + "go2/urdf/go2.urdf"
         # Use the SDK's OBJ visuals; keep our URDF's complete physical model.
         vsim_visual_mesh_dir = "{GYM_ROOT_DIR}/thirdparty/vlearn/assets/go2/assets"
+        mujoco_visual_model = None
         foot_name = "foot"
         penalize_contacts_on = ["calf"]
         terminate_after_contacts_on = ["base", "Head", "hip", "thigh"]
@@ -176,7 +177,7 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
                 min_base_height = 0.0
-                tracking_base_height = 4.0
+                tracking_base_height = 6.0
                 action_rate = 0.1
                 action_rate2 = 0.05
                 trot_support = 3.0
