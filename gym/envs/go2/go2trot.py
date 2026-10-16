@@ -56,6 +56,7 @@ class Go2Trot(LeggedRobot):
             dtype=torch.float,
             device=self.device,
         )
+        self._init_height_reference()
         self._update_phase_observation()
         self._update_gait_reference()
 
@@ -63,10 +64,42 @@ class Go2Trot(LeggedRobot):
         self.phase_obs[:, 0:1] = torch.sin(self.phase)
         self.phase_obs[:, 1:2] = torch.cos(self.phase)
 
+    def _init_height_reference(self):
+        """Constants for shifting the reference posture with the height command."""
+        default = self.default_dof_pos[0].index_select(0, self.actuated_dof_indices)
+        self._thigh_idx = torch.tensor([1, 4, 7, 10], device=self.device)
+        self._calf_idx = torch.tensor([2, 5, 8, 11], device=self.device)
+        self._thigh0 = default[1].item()
+        self._calf0 = default[2].item()
+        L = self.cfg.control.leg_link_length
+        # Foot position relative to the hip in the default posture.
+        self._foot_x0 = L * (
+            torch.sin(torch.tensor(self._thigh0))
+            + torch.sin(torch.tensor(self._thigh0 + self._calf0))
+        ).item()
+        calf_limits = self._actuated_dof_pos_limits[2]
+        self._calf_min, self._calf_max = calf_limits[0].item(), calf_limits[1].item()
+        self.height_reference_offset = torch.zeros_like(self.gait_reference)
+
+    def _update_height_reference(self):
+        """Thigh/calf offsets (per env) that move the reference to commands[:, 3]."""
+        L = self.cfg.control.leg_link_length
+        z = (self.commands[:, 3] - self.cfg.control.foot_radius).clamp(min=0.05)
+        x = torch.full_like(z, self._foot_x0)
+        d2 = (x.square() + z.square()).clamp(max=(2 * L) ** 2 * 0.999)
+        cos_calf = ((d2 - 2 * L * L) / (2 * L * L)).clamp(-1.0, 1.0)
+        calf = (-torch.acos(cos_calf)).clamp(self._calf_min, self._calf_max)
+        thigh = torch.atan2(x, z) - 0.5 * calf
+        self.height_reference_offset.zero_()
+        self.height_reference_offset[:, self._thigh_idx] = (thigh - self._thigh0)[:, None]
+        self.height_reference_offset[:, self._calf_idx] = (calf - self._calf0)[:, None]
+
     def _update_gait_reference(self):
         joint_phase = self.phase + self._gait_dof_phase_offsets.unsqueeze(0)
+        self._update_height_reference()
         self.gait_reference[:] = (
             self._gait_joint_offsets
+            + self.height_reference_offset
             + self._gait_joint_amplitudes * torch.sin(joint_phase)
         )
 
@@ -264,7 +297,7 @@ class Go2Trot(LeggedRobot):
             dim=1,
         )
 
-    # Give a reward absed on how well the height tracks the inputted commands
+    # Give a reward based on how well the height tracks the inputted commands
     def _reward_tracking_base_height(self):
         error = torch.square(self.base_height[:, 0] - self.commands[:, 3])
         return torch.exp(-error / self.cfg.reward_settings.tracking_sigma_height)

@@ -26,9 +26,6 @@ def main():
 
         env.hold_height_command = True  # resets must not resample it
         env.commands[:, :3] = 0.0  # trot in place: grade height on its own
-
-        env.hold_base_height_target = True  # resets must not resample it
-        env.commands[:] = 0.0  # trot in place: grade height on its own
         low, high = env.command_ranges["base_height"]
         mid = 0.5 * (low + high)
 

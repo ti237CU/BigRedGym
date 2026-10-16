@@ -56,15 +56,20 @@ class Go2TrotCfg(Go2Cfg):
         # shortening the swing diagonal.
         gait_joint_offsets = 4 * [0.0, 0.0, 0.0]
         gait_joint_amplitudes = 4 * [0.0, -0.15, 0.30]
+        # Go2 leg geometry from URDF
+        leg_link_length = 0.213
+        foot_radius = 0.022
 
     class commands(Go2Cfg.commands):
         # Standard deviation in m/s around the forward-command centers below.
         var = 0.1
+        base_height_extreme_prob = 0.3  # 30% of the time it gets trained on max or min height
 
         class ranges(Go2Cfg.commands.ranges):
             lin_vel_x = [-0.5, 0.0, 0.5, 1.0, 2.0]
             lin_vel_y = 0.5
             yaw_vel = 1.5
+            base_height = [0.18, 0.38]  # Command range for height input
 
     class push_robots(Go2Cfg.push_robots):
         toggle = True
@@ -170,21 +175,13 @@ class Go2TrotRunnerCfg(Go2RunnerCfg):
                 dof_pos_limits = 0.0
                 feet_contact_forces = 0.0
                 dof_near_home = 0.0
-<<<<<<< HEAD
-                min_base_height = 0.0       # fixed-height reward fights lowest position
-                tracking_base_height = 3.0
-                action_rate = 0.25
-                action_rate2 = 0.025
-                trot_support = 0.625
-                swing_contact = 1.25
-=======
-                min_base_height = 0.5
+                min_base_height = 0.0
+                tracking_base_height = 4.0
                 action_rate = 0.1
                 action_rate2 = 0.05
                 trot_support = 3.0
                 swing_contact = 3.0
                 reference_traj = 3.0
->>>>>>> origin/main
 
             class termination_weight:
                 termination = 0.01
